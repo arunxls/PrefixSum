@@ -9,9 +9,152 @@
 #include <sstream>
 #include <iostream>
 
+using namespace std;
+
 class Prefix {
 public:
+    Prefix(int proc, int numints) {
+        this->proc = proc;
+        this->numints = numints;
 
+        /* Allocate shared memory, enough for each thread to have numints*/
+        this->data = (int *) malloc(sizeof(int) * numints * proc);
+
+        /* Allocate shared memory for partial_sums */
+        this->partial_sums = (long long*) malloc(sizeof(long long) * proc);
+    }
+
+    ~Prefix() {
+        free(data);
+        free(partial_sums);
+    }
+
+    void generate_input(int mod) {
+        #pragma omp parallel
+        {
+            /* get the current thread ID in the parallel region */
+            int tid = omp_get_thread_num();
+            srand(tid + time(NULL));    /* Seed rand functions */
+
+            for(int i = tid * numints; i < (tid +1) * numints; ++i) {
+                // data[i] = rand()%mod;
+                data[i] = i + 1;
+            }
+        }
+    }
+
+    void print(ostringstream &o) {
+        o.str("");
+        o.clear();
+    
+        for(int i = 0; i < (proc) * numints; ++i) {
+            o << " " << data[i];
+        }
+    }
+
+/*****************************************************
+    * Generate the sum of the ints in parallel          *
+    * NOTE: Repeated for numiterations                  *
+    *****************************************************/
+    void calculate_prefix() {
+
+        //Calculate n/p prefix sums
+        #pragma omp parallel num_threads(proc)
+        {
+            /* get the current thread ID in the parallel region */
+            int tid = omp_get_thread_num();
+
+            /* Compute the local partial sum */
+            long long partial_sum = 0;
+
+            int start_id = tid * numints;
+            int end_id = (tid + 1) * numints;
+
+            int i;
+            for(i = start_id + 1; i < end_id; ++i) {
+                data[i] += data[i-1];
+            }
+
+            /* Write the partial result to share memory */
+            partial_sums[tid] = data[end_id - 1];
+        }
+
+        // std::cout << "=======================================================\n";
+        // for(int i = 0; i < numints * proc; ++i) {
+        //   std::ostringstream oss;
+        //   oss << " " << data[i];
+        //   std::cout << oss.str();
+        // }
+        // std::cout << "\n=======================================================\n\n";
+
+        // std::cout << "\nStarting Sweep-up" <<std::endl;
+
+        for(int h = 0; h < floor(log(proc)/log(2) + 0.5); h++) {
+            #pragma omp parallel for num_threads(proc/(int) pow(2, h))
+            for(int i = 0; i < (proc/(int) pow(2, h+1)); i++) {
+                int a = (((int) pow(2, h+1)) * (i + 1)) -1;
+                int b = a - (int) pow(2,h);
+                partial_sums[a] = partial_sums[a] + partial_sums[b];
+            }
+
+          // std::cout << "\n=======================================================\n";
+          // for(int i = 0; i < proc; ++i) {
+          //   std::ostringstream oss;
+          //   oss << " " << partial_sums[i];
+          //   std::cout << oss.str();
+          // }
+          // std::cout << "\n=======================================================\n\n";
+
+        }
+
+        // std::cout << "\nStarting Sweep-down" <<std::endl;
+        int max = partial_sums[proc-1];
+        partial_sums[proc-1] = 0;
+
+        for(int h = floor(log(proc)/log(2) + 0.5) - 1; h > -1; h--) {
+            #pragma omp parallel for num_threads(proc/(int) pow(2, h))
+            for(int i = 0; i < (proc/(int) pow(2, h+1)); i++) {
+                int a = (((int) pow(2, h+1)) * (i + 1)) -1;
+                int b = a - (int) pow(2,h);
+                int temp = partial_sums[a];
+                partial_sums[a] = partial_sums[a] + partial_sums[b];
+                partial_sums[b] = temp;
+            }
+
+          // std::cout << "\n=======================================================\n";
+          // for(int i = 0; i < proc; ++i) {
+          //   std::ostringstream oss;
+          //   oss << " " << partial_sums[i];
+          //   std::cout << oss.str();
+          // }
+          // std::cout << "\n=======================================================\n\n";
+
+        }
+
+        #pragma omp parallel num_threads(proc)
+        {
+
+            /* get the current thread ID in the parallel region */
+            int tid = omp_get_thread_num();
+
+            /* Compute the local partial sum */
+            long long partial_sum = 0;
+
+            int start_id = tid * numints;
+            int end_id = (tid + 1) * numints;
+
+            long long diff = partial_sums[tid] - data[end_id-1];
+            for(int i = start_id; i < end_id; ++i) {
+              data[i] += diff;
+            }
+        }
+    }
+
+private:
+    int proc;
+    int *data;
+    long long *partial_sums;
+    int numints;
 };
 
 void print_elapsed(char* desc, struct timeval* start, struct timeval* end, int niters) {
@@ -26,7 +169,7 @@ void print_elapsed(char* desc, struct timeval* start, struct timeval* end, int n
     elapsed.tv_usec = end->tv_usec - start->tv_usec;
     elapsed.tv_sec  = end->tv_sec  - start->tv_sec;
 
-    printf("\n %s total elapsed time = %ld (usec)", desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec) / niters);
+    printf("\n%s total elapsed time = %ld (usec)\n", desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec) / niters);
 }
 
 
@@ -52,10 +195,6 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    double param = 5.5;
-    double result = log (param);
-    // printf ("log(%f) = %f\n", param, result );
-
     numthreads    = atoi(argv[1]);
     numints       = atoi(argv[2]);
     numiterations = atoi(argv[3]);
@@ -66,159 +205,33 @@ int main(int argc, char *argv[]) {
     printf("\nExecuting %s: nthreads=%d, numints=%d, numiterations=%d\n",
             argv[0], omp_get_max_threads(), numints, numiterations);
 
-    /* Allocate shared memory, enough for each thread to have numints*/
-    data = (int *) malloc(sizeof(int) * numints * omp_get_max_threads());
-
-    /* Allocate shared memory for partial_sums */
-    partial_sums = (long long*) malloc(sizeof(long long) * omp_get_max_threads());
+    
 
     /*****************************************************
     * Generate the random ints in parallel              *
     *****************************************************/
-    #pragma omp parallel shared(numints,data)
-    {
-        int tid;
 
-        /* get the current thread ID in the parallel region */
-        tid = omp_get_thread_num();
+    Prefix* p = new Prefix(numthreads, numints);
+    std::ostringstream oss;
 
-        srand(tid + time(NULL));    /* Seed rand functions */
+    p->generate_input(10);
+    
+    std::cout << "\n=======================================================\n";
+    p->print(oss);
+    cout << oss.str();
+    std::cout << "\n=======================================================\n";
 
-        int i;
-        for(i = tid * numints; i < (tid +1) * numints; ++i) {
-            // data[i] = rand()%10;
-            data[i] = i + 1;
-        }
-    }
-
-    std::cout << "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-
-    for(int i = 0; i < (numthreads) * numints; ++i) {
-        std::ostringstream oss;
-        oss << " " << data[i];
-        std::cout << oss.str();
-    }
-
-    std::cout << "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-
-
-    /*****************************************************
-    * Generate the sum of the ints in parallel          *
-    * NOTE: Repeated for numiterations                  *
-    *****************************************************/
     gettimeofday(&start, &tzp);
-
-    int iteration;
-    for(iteration=0; iteration < numiterations; ++iteration) {
-
-        #pragma omp parallel shared(numints,data,partial_sums,total_sum)
-        {
-            int tid;
-
-            /* get the current thread ID in the parallel region */
-            tid = omp_get_thread_num();
-
-            /* Compute the local partial sum */
-            long long partial_sum = 0;
-
-            int start_id = tid * numints;
-            int end_id = (tid + 1) * numints;
-
-            int i;
-            for(i = start_id + 1; i < end_id; ++i) {
-                data[i] += data[i-1];
-            }
-
-            /* Write the partial result to share memory */
-            partial_sums[tid] = data[end_id - 1];
-        }
-
-        /* Compute the sum of the partial sums */
-        total_sum = 0;
-        int max_threads = omp_get_max_threads();
-
-        int i;
-        for(i = 0; i < max_threads ; ++i) {
-            total_sum += partial_sums[i];
-        }
-    }
-
-    // std::cout << "=======================================================\n";
-    // for(int i = 0; i < numints * omp_get_max_threads(); ++i) {
-    //   std::ostringstream oss;
-    //   oss << " " << data[i];
-    //   std::cout << oss.str();
-    // }
-    // std::cout << "\n=======================================================\n\n";
-
-    // std::cout << "\nStarting Sweep-up" <<std::endl;
-
-    for(int h = 0; h < floor(log(numthreads)/log(2) + 0.5); h++) {
-        omp_set_num_threads(numthreads/(int) pow(2, h));
-
-        #pragma omp parallel for shared(numints,data,partial_sums,total_sum)
-        for(int i = 0; i < (numthreads/(int) pow(2, h+1)); i++) {
-            int a = (((int) pow(2, h+1)) * (i + 1)) -1;
-            int b = a - (int) pow(2,h);
-            partial_sums[a] = partial_sums[a] + partial_sums[b];
-        }
-
-          // std::cout << "\n=======================================================\n";
-          // for(int i = 0; i < numthreads; ++i) {
-          //   std::ostringstream oss;
-          //   oss << " " << partial_sums[i];
-          //   std::cout << oss.str();
-          // }
-          // std::cout << "\n=======================================================\n\n";
-
-    }
-
-    // std::cout << "\nStarting Sweep-down" <<std::endl;
-    int max = partial_sums[numthreads-1];
-    partial_sums[numthreads-1] = 0;
-
-    for(int h = floor(log(numthreads)/log(2) + 0.5) - 1; h > -1; h--) {
-        omp_set_num_threads(numthreads/(int) pow(2, h));
-
-        #pragma omp parallel for shared(numints,data,partial_sums,total_sum)
-        for(int i = 0; i < (numthreads/(int) pow(2, h+1)); i++) {
-            int a = (((int) pow(2, h+1)) * (i + 1)) -1;
-            int b = a - (int) pow(2,h);
-            int temp = partial_sums[a];
-            partial_sums[a] = partial_sums[a] + partial_sums[b];
-            partial_sums[b] = temp;
-        }
-
-      // std::cout << "\n=======================================================\n";
-      // for(int i = 0; i < numthreads; ++i) {
-      //   std::ostringstream oss;
-      //   oss << " " << partial_sums[i];
-      //   std::cout << oss.str();
-      // }
-      // std::cout << "\n=======================================================\n\n";
-
-    }
-    omp_set_num_threads(numthreads);
-    #pragma omp parallel shared(numints,data,partial_sums,total_sum)
-    {
-        int tid;
-
-        /* get the current thread ID in the parallel region */
-        tid = omp_get_thread_num();
-
-        /* Compute the local partial sum */
-        long long partial_sum = 0;
-
-        int start_id = tid * numints;
-        int end_id = (tid + 1) * numints;
-
-        long long diff = partial_sums[tid] - data[end_id-1];
-        for(int i = start_id; i < end_id; ++i) {
-          data[i] += diff;
-        }
-    }
-
+    p->calculate_prefix();
     gettimeofday(&end,&tzp);
+
+
+    
+    std::cout << "\n=======================================================\n";
+    p->print(oss);
+    cout << oss.str();
+    std::cout << "\n=======================================================\n";
+    
 
     /*****************************************************
     * Output timing results                             *
@@ -226,17 +239,16 @@ int main(int argc, char *argv[]) {
 
     print_elapsed("Summation", &start, &end, numiterations);
 
-    std::cout << "\n=======================================================\n";
-    for(int i = 1; i < numthreads; ++i) {
-        std::ostringstream oss;
-        oss << " " << partial_sums[i];
-        std::cout << oss.str();
-    }
-    std::cout << " " << max;
-    std::cout << "\n=======================================================\n\n";
+    // std::cout << "\n=======================================================\n";
+    // for(int i = 1; i < numthreads; ++i) {
+    //     std::ostringstream oss;
+    //     oss << " " << partial_sums[i];
+    //     std::cout << oss.str();
+    // }
+    // std::cout << " " << max;
+    // std::cout << "\n=======================================================\n\n";
 
-    free(data);
-    free(partial_sums);
+    delete(p);
 
     return(0);
 }
