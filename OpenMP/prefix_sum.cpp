@@ -17,12 +17,13 @@ public:
     Prefix(int proc, int numints) {
         this->proc = proc;
         this->numints = numints;
+        this->s_proc = pow(2,ceil(log(proc)/log(2)));
 
         /* Allocate shared memory, enough for each thread to have numints*/
         this->data = (int *) malloc(sizeof(int) * numints * proc);
 
         /* Allocate shared memory for partial_sums */
-        this->partial_sums = (long long*) malloc(sizeof(long long) * proc);
+        this->partial_sums = (long long*) calloc(proc, sizeof(long long) * proc);
     }
 
     ~Prefix() {
@@ -90,16 +91,16 @@ public:
 
         // std::cout << "\nStarting Sweep-up" <<std::endl;
 
-        for(int h = 0; h < floor(log(proc)/log(2) + 0.5); h++) {
-            #pragma omp parallel for num_threads(proc/(int) pow(2, h))
-            for(int i = 0; i < (proc/(int) pow(2, h+1)); i++) {
+        for(int h = 0; h < floor(log(s_proc)/log(2) + 0.5); h++) {
+            #pragma omp parallel for num_threads(s_proc/(int) pow(2, h))
+            for(int i = 0; i < (s_proc/(int) pow(2, h+1)); i++) {
                 int a = (((int) pow(2, h+1)) * (i + 1)) -1;
                 int b = a - (int) pow(2,h);
                 partial_sums[a] = partial_sums[a] + partial_sums[b];
             }
 
           // std::cout << "\n=======================================================\n";
-          // for(int i = 0; i < proc; ++i) {
+          // for(int i = 0; i < s_proc; ++i) {
           //   std::ostringstream oss;
           //   oss << " " << partial_sums[i];
           //   std::cout << oss.str();
@@ -109,12 +110,12 @@ public:
         }
 
         // std::cout << "\nStarting Sweep-down" <<std::endl;
-        int max = partial_sums[proc-1];
-        partial_sums[proc-1] = 0;
+        int max = partial_sums[s_proc-1];
+        partial_sums[s_proc-1] = 0;
 
-        for(int h = floor(log(proc)/log(2) + 0.5) - 1; h > -1; h--) {
-            #pragma omp parallel for num_threads(proc/(int) pow(2, h))
-            for(int i = 0; i < (proc/(int) pow(2, h+1)); i++) {
+        for(int h = floor(log(s_proc)/log(2) + 0.5) - 1; h > -1; h--) {
+            #pragma omp parallel for num_threads(s_proc/(int) pow(2, h))
+            for(int i = 0; i < (s_proc/(int) pow(2, h+1)); i++) {
                 int a = (((int) pow(2, h+1)) * (i + 1)) -1;
                 int b = a - (int) pow(2,h);
                 int temp = partial_sums[a];
@@ -123,7 +124,7 @@ public:
             }
 
           // std::cout << "\n=======================================================\n";
-          // for(int i = 0; i < proc; ++i) {
+          // for(int i = 0; i < s_proc; ++i) {
           //   std::ostringstream oss;
           //   oss << " " << partial_sums[i];
           //   std::cout << oss.str();
@@ -145,6 +146,7 @@ public:
         }
 
         free(partial_sums);
+        partial_sums = NULL;
         this->partial_sums = temp;
 
         #pragma omp parallel num_threads(proc)
@@ -169,6 +171,7 @@ private:
     int *data;
     long long *partial_sums;
     int numints;
+    int s_proc;
 };
 
 void print_elapsed(char* desc, struct timeval* start, struct timeval* end, int niters) {
@@ -220,8 +223,6 @@ int main(int argc, char *argv[]) {
 
     printf("\nExecuting %s: nthreads=%d, numints=%d, numiterations=%d\n",
             argv[0], omp_get_max_threads(), numints, numiterations);
-
-    
 
     /*****************************************************
     * Generate the random ints in parallel              *
