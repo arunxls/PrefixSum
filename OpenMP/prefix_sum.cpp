@@ -148,6 +148,21 @@ public:
               data[i] += diff;
             }
         }
+
+        /* Allocate shared memory, enough for each thread to have numints*/
+        int* temp = (int *) malloc(sizeof(int) * numints * proc);
+        temp[proc-1] = max;
+
+        #pragma omp parallel num_threads(proc-1)
+        {
+
+            /* get the current thread ID in the parallel region */
+            int tid = omp_get_thread_num();
+            temp[tid] = data[tid + 1];
+        }
+
+        free(data);
+        this->data = temp;
     }
 
 private:
