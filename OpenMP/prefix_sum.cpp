@@ -131,14 +131,26 @@ public:
 
         }
 
+        /* Allocate shared memory, enough for each thread to have numints*/
+        long long* temp = (long long*) malloc(sizeof(long long) * proc);
+        temp[proc-1] = max;
+
+        if(proc > 1) {
+            #pragma omp parallel num_threads(proc - 1)
+            {
+                int tid = omp_get_thread_num();
+                temp[tid] = partial_sums[tid + 1];
+            }
+        }
+
+        free(partial_sums);
+        this->partial_sums = temp;
+
         #pragma omp parallel num_threads(proc)
         {
 
             /* get the current thread ID in the parallel region */
             int tid = omp_get_thread_num();
-
-            /* Compute the local partial sum */
-            long long partial_sum = 0;
 
             int start_id = tid * numints;
             int end_id = (tid + 1) * numints;
@@ -149,20 +161,6 @@ public:
             }
         }
 
-        /* Allocate shared memory, enough for each thread to have numints*/
-        int* temp = (int *) malloc(sizeof(int) * numints * proc);
-        temp[proc-1] = max;
-
-        #pragma omp parallel num_threads(proc-1)
-        {
-
-            /* get the current thread ID in the parallel region */
-            int tid = omp_get_thread_num();
-            temp[tid] = data[tid + 1];
-        }
-
-        free(data);
-        this->data = temp;
     }
 
 private:
