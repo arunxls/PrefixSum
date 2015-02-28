@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sstream>
 #include <iostream>
+#include <assert.h>
 
 using namespace std;
 
@@ -211,6 +212,8 @@ int main(int argc, char *argv[]) {
     numthreads    = atoi(argv[1]);
     numints       = atoi(argv[2]);
     numiterations = atoi(argv[3]);
+
+    assert(numthreads > 1);
 
     //Set the number of threads
     omp_set_num_threads(numthreads);
