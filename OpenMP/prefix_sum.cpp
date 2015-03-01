@@ -10,6 +10,8 @@
 #include <iostream>
 #include <assert.h>
 
+// TODO - include num-iter
+
 using namespace std;
 
 class Prefix {
@@ -20,7 +22,8 @@ public:
         this->s_proc = pow(2,ceil(log(proc)/log(2)));
 
         /* Allocate shared memory, enough for each thread to have numints*/
-        this->data = (int *) malloc(sizeof(int) * numints * proc);
+        this->data  = (int *) malloc(sizeof(int) * numints * proc);
+        this->input = (int *) malloc(sizeof(int) * numints * proc);
 
         /* Allocate shared memory for partial_sums */
         this->partial_sums = (long long*) calloc(proc, sizeof(long long) * proc);
@@ -32,7 +35,7 @@ public:
     }
 
     void generate_input(int mod) {
-        #pragma omp parallel
+        #pragma omp parallel num_threads(proc)
         {
             /* get the current thread ID in the parallel region */
             int tid = omp_get_thread_num();
@@ -40,6 +43,7 @@ public:
 
             for(int i = tid * numints; i < (tid +1) * numints; ++i) {
                 // data[i] = rand()%mod;
+                input[i] = i + 1;
                 data[i] = i + 1;
             }
         }
@@ -74,7 +78,7 @@ public:
 
             int i;
             for(i = start_id + 1; i < end_id; ++i) {
-                data[i] += data[i-1];
+                data[i] = input[i] + data[i-1];
             }
 
             /* Write the partial result to share memory */
@@ -163,18 +167,19 @@ public:
               data[i] += diff;
             }
         }
-
     }
 
 private:
     int proc;
     int *data;
+    int *input;
     long long *partial_sums;
     int numints;
     int s_proc;
+
 };
 
-void print_elapsed(char* desc, struct timeval* start, struct timeval* end, int niters) {
+long print_elapsed(struct timeval* start, struct timeval* end) {
 
     struct timeval elapsed;
     /* calculate elapsed time */
@@ -186,7 +191,7 @@ void print_elapsed(char* desc, struct timeval* start, struct timeval* end, int n
     elapsed.tv_usec = end->tv_usec - start->tv_usec;
     elapsed.tv_sec  = end->tv_sec  - start->tv_sec;
 
-    printf("\n%s total elapsed time = %ld (usec)\n", desc, (elapsed.tv_sec*1000000 + elapsed.tv_usec) / niters);
+    return (elapsed.tv_sec*1000000 + elapsed.tv_usec);
 }
 
 
@@ -228,44 +233,31 @@ int main(int argc, char *argv[]) {
     * Generate the random ints in parallel              *
     *****************************************************/
 
-    Prefix* p = new Prefix(numthreads, numints);
-    std::ostringstream oss;
+    long total_time = 0.0;
+    for(int i = 0; i < numiterations; i++) {
+        Prefix* p = new Prefix(numthreads, numints);
+        std::ostringstream oss;
 
-    p->generate_input(10);
+        p->generate_input(10);
+
+        gettimeofday(&start, &tzp);
+        p->calculate_prefix();
+        gettimeofday(&end,&tzp);
+
+        // std::cout << "\n=======================================================\n";
+        // p->print(oss);
+        // cout << oss.str();
+        // std::cout << "\n=======================================================\n";   
+        delete(p);
+        total_time += print_elapsed(&start, &end);
+
+    }
     
-    std::cout << "\n=======================================================\n";
-    p->print(oss);
-    cout << oss.str();
-    std::cout << "\n=======================================================\n";
-
-    gettimeofday(&start, &tzp);
-    p->calculate_prefix();
-    gettimeofday(&end,&tzp);
-
-
-    
-    std::cout << "\n=======================================================\n";
-    p->print(oss);
-    cout << oss.str();
-    std::cout << "\n=======================================================\n";
-    
-
     /*****************************************************
     * Output timing results                             *
     *****************************************************/
 
-    print_elapsed("Summation", &start, &end, numiterations);
-
-    // std::cout << "\n=======================================================\n";
-    // for(int i = 1; i < numthreads; ++i) {
-    //     std::ostringstream oss;
-    //     oss << " " << partial_sums[i];
-    //     std::cout << oss.str();
-    // }
-    // std::cout << " " << max;
-    // std::cout << "\n=======================================================\n\n";
-
-    delete(p);
+    printf("\nSummation total elapsed time = %ld (usec)\n", total_time / numiterations);
 
     return(0);
 }
