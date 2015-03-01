@@ -10,8 +10,6 @@
 #include <iostream>
 #include <assert.h>
 
-// TODO - include num-iter
-
 using namespace std;
 
 class Prefix {
@@ -23,7 +21,6 @@ public:
 
         /* Allocate shared memory, enough for each thread to have numints*/
         this->data  = (int *) malloc(sizeof(int) * numints * proc);
-        this->input = (int *) malloc(sizeof(int) * numints * proc);
 
         /* Allocate shared memory for partial_sums */
         this->partial_sums = (long long*) calloc(proc, sizeof(long long) * proc);
@@ -34,6 +31,9 @@ public:
         free(partial_sums);
     }
 
+    /*****************************************************
+    * Generate the random ints in parallel              *
+    *****************************************************/
     void generate_input(int mod) {
         #pragma omp parallel num_threads(proc)
         {
@@ -43,12 +43,14 @@ public:
 
             for(int i = tid * numints; i < (tid +1) * numints; ++i) {
                 // data[i] = rand()%mod;
-                input[i] = i + 1;
                 data[i] = i + 1;
             }
         }
     }
 
+    /*****************************************************
+    * Print the entries of *data                         *
+    *****************************************************/
     void print(ostringstream &o) {
         o.str("");
         o.clear();
@@ -58,111 +60,73 @@ public:
         }
     }
 
-/*****************************************************
-    * Generate the sum of the ints in parallel          *
-    * NOTE: Repeated for numiterations                  *
+    /*****************************************************
+    * Perform the Prefix-Sum Balanced Tree Algorithm     *
     *****************************************************/
     void calculate_prefix() {
-
         //Calculate n/p prefix sums
         #pragma omp parallel num_threads(proc)
         {
-            /* get the current thread ID in the parallel region */
-            int tid = omp_get_thread_num();
-
-            /* Compute the local partial sum */
+            int tid               = omp_get_thread_num();
             long long partial_sum = 0;
+            int start_id          = tid * numints;
+            int end_id            = (tid + 1) * numints;
 
-            int start_id = tid * numints;
-            int end_id = (tid + 1) * numints;
-
-            int i;
-            for(i = start_id + 1; i < end_id; ++i) {
-                data[i] = input[i] + data[i-1];
+            for(int i = start_id + 1; i < end_id; ++i) {
+                data[i] += data[i-1];
             }
 
             /* Write the partial result to share memory */
             partial_sums[tid] = data[end_id - 1];
         }
 
-        // std::cout << "=======================================================\n";
-        // for(int i = 0; i < numints * proc; ++i) {
-        //   std::ostringstream oss;
-        //   oss << " " << data[i];
-        //   std::cout << oss.str();
-        // }
-        // std::cout << "\n=======================================================\n\n";
-
-        // std::cout << "\nStarting Sweep-up" <<std::endl;
-
+        //Starting Sweep-up operation
         for(int h = 0; h < floor(log(s_proc)/log(2) + 0.5); h++) {
             #pragma omp parallel for num_threads(s_proc/(int) pow(2, h))
             for(int i = 0; i < (s_proc/(int) pow(2, h+1)); i++) {
-                int a = (((int) pow(2, h+1)) * (i + 1)) -1;
-                int b = a - (int) pow(2,h);
+                int a           = (((int) pow(2, h+1)) * (i + 1)) -1;
+                int b           = a - (int) pow(2,h);
                 partial_sums[a] = partial_sums[a] + partial_sums[b];
             }
-
-          // std::cout << "\n=======================================================\n";
-          // for(int i = 0; i < s_proc; ++i) {
-          //   std::ostringstream oss;
-          //   oss << " " << partial_sums[i];
-          //   std::cout << oss.str();
-          // }
-          // std::cout << "\n=======================================================\n\n";
-
         }
 
-        // std::cout << "\nStarting Sweep-down" <<std::endl;
+        //Starting Sweep-down operation
         int max = partial_sums[s_proc-1];
         partial_sums[s_proc-1] = 0;
 
         for(int h = floor(log(s_proc)/log(2) + 0.5) - 1; h > -1; h--) {
             #pragma omp parallel for num_threads(s_proc/(int) pow(2, h))
             for(int i = 0; i < (s_proc/(int) pow(2, h+1)); i++) {
-                int a = (((int) pow(2, h+1)) * (i + 1)) -1;
-                int b = a - (int) pow(2,h);
-                int temp = partial_sums[a];
+                int a           = (((int) pow(2, h+1)) * (i + 1)) -1;
+                int b           = a - (int) pow(2,h);
+                int temp        = partial_sums[a];
+
                 partial_sums[a] = partial_sums[a] + partial_sums[b];
                 partial_sums[b] = temp;
             }
-
-          // std::cout << "\n=======================================================\n";
-          // for(int i = 0; i < s_proc; ++i) {
-          //   std::ostringstream oss;
-          //   oss << " " << partial_sums[i];
-          //   std::cout << oss.str();
-          // }
-          // std::cout << "\n=======================================================\n\n";
-
         }
 
-        /* Allocate shared memory, enough for each thread to have numints*/
+        //Allocate a temp memory to pop off the first value, which is a '0'
         long long* temp = (long long*) malloc(sizeof(long long) * proc);
         temp[proc-1] = max;
 
-        if(proc > 1) {
-            #pragma omp parallel num_threads(proc - 1)
-            {
-                int tid = omp_get_thread_num();
-                temp[tid] = partial_sums[tid + 1];
-            }
+        #pragma omp parallel for num_threads(proc - 1)
+        for(int i = 0; i < proc - 1; i++) {
+            temp[i] = partial_sums[i + 1];
         }
 
         free(partial_sums);
         partial_sums = NULL;
         this->partial_sums = temp;
 
+        //Now calculate the prefix sum for elements insde each n/p section
         #pragma omp parallel num_threads(proc)
         {
-
-            /* get the current thread ID in the parallel region */
-            int tid = omp_get_thread_num();
-
-            int start_id = tid * numints;
-            int end_id = (tid + 1) * numints;
-
+            int tid        = omp_get_thread_num();
+            int start_id   = tid * numints;
+            int end_id     = (tid + 1) * numints;
             long long diff = partial_sums[tid] - data[end_id-1];
+
             for(int i = start_id; i < end_id; ++i) {
               data[i] += diff;
             }
@@ -171,11 +135,11 @@ public:
 
 private:
     int proc;
-    int *data;
-    int *input;
-    long long *partial_sums;
     int numints;
     int s_proc;
+
+    int *data;
+    long long *partial_sums;
 
 };
 
@@ -229,28 +193,24 @@ int main(int argc, char *argv[]) {
     printf("\nExecuting %s: nthreads=%d, numints=%d, numiterations=%d\n",
             argv[0], omp_get_max_threads(), numints, numiterations);
 
-    /*****************************************************
-    * Generate the random ints in parallel              *
-    *****************************************************/
+    
 
     long total_time = 0.0;
     for(int i = 0; i < numiterations; i++) {
         Prefix* p = new Prefix(numthreads, numints);
-        std::ostringstream oss;
-
         p->generate_input(10);
 
         gettimeofday(&start, &tzp);
         p->calculate_prefix();
         gettimeofday(&end,&tzp);
 
-        // std::cout << "\n=======================================================\n";
+        // ostringstream oss;
+        // cout << "\n=======================================================\n";
         // p->print(oss);
         // cout << oss.str();
-        // std::cout << "\n=======================================================\n";   
+        // cout << "\n=======================================================\n";   
         delete(p);
         total_time += print_elapsed(&start, &end);
-
     }
     
     /*****************************************************
