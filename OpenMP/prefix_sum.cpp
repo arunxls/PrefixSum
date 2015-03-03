@@ -42,7 +42,7 @@ public:
             srand(tid + time(NULL));    /* Seed rand functions */
 
             for(int i = tid * numints; i < (tid +1) * numints; ++i) {
-                // data[i] = rand()%mod;
+                //data[i] = rand()%10000;
                 data[i] = i + 1;
             }
         }
@@ -185,7 +185,7 @@ int main(int argc, char *argv[]) {
     numints       = atoi(argv[2]);
     numiterations = atoi(argv[3]);
 
-    assert(numthreads > 1);
+    assert(numthreads > 0);
 
     //Set the number of threads
     omp_set_num_threads(numthreads);
@@ -197,20 +197,30 @@ int main(int argc, char *argv[]) {
 
     long total_time = 0.0;
     for(int i = 0; i < numiterations; i++) {
+        ostringstream oss;
         Prefix* p = new Prefix(numthreads, numints);
+        gettimeofday(&start, &tzp);
         p->generate_input(10);
+        gettimeofday(&end, &tzp);
+
+        cout << "\n==============BEGIN INPUT===============================\n";
+        p->print(oss);
+        cout << oss.str();
+        cout << "\n==============END INPUT=================================\n"; 
+
+        printf("\nInput generation time = %ld (usec)\n", print_elapsed(&start, &end));
 
         gettimeofday(&start, &tzp);
         p->calculate_prefix();
         gettimeofday(&end,&tzp);
 
-        // ostringstream oss;
-        // cout << "\n=======================================================\n";
-        // p->print(oss);
-        // cout << oss.str();
-        // cout << "\n=======================================================\n";   
+         cout << "\n==============BEGIN OUTPUT==============================\n";
+         p->print(oss);
+         cout << oss.str();
+         cout << "\n==============END OUTPUT================================\n"; 
         delete(p);
         total_time += print_elapsed(&start, &end);
+        printf("\nOutput generation time = %ld (usec)\n", print_elapsed(&start, &end));
     }
     
     /*****************************************************
