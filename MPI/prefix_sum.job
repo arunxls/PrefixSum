@@ -9,7 +9,7 @@
 # $PBS_O_WORKDIR is the directory from which the job was submitted
 cd $PBS_O_WORKDIR
 
-mpirun -np 32 ./prefix_sum.x 2 1
+mpirun -np 32 ./prefix_sum.x 1000 1000
 
 # output from the runs will be in prefix_sum_mpi_32.o#### where #### is the job id.
 #---------------- end of job file --------------------------

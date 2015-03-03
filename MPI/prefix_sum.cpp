@@ -31,19 +31,21 @@
 #include <sys/time.h>
 #include <iostream>
 #include <math.h>
+ #include <limits>
 
 using namespace std;
 
 /*==============================================================
  * p_generate_random_ints (processor-wise generation of random ints)
  *==============================================================*/
-void p_generate_random_ints(int* memory, int n) {
+void p_generate_random_ints(int* memory, int n, int ntotal) {
     int my_id;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_id);
     srand(my_id + time(NULL));                  /* Seed rand functions */
+    int mod = std::numeric_limits<int>::max() / (ntotal + 1);
     for (int i = 0; i <  n; ++i) {
-        memory[i] = rand() % 10;
-        memory[i] = (my_id*n) + i + 1;
+        memory[i] = rand() % mod;
+        // memory[i] = (my_id*n) + i + 1;
     }
 }
 
@@ -62,7 +64,7 @@ int p_summation(int* memory, int n) {
 /*==============================================================
  * get_elapsed (get timing statistics)
  *==============================================================*/
-long get_elapsed(struct timeval* start, struct timeval* end) {
+int get_elapsed(struct timeval* start, struct timeval* end) {
 
     struct timeval elapsed;
     /* calculate elapsed time */
@@ -173,18 +175,19 @@ int main ( int argc, char **argv) {
     }
 
     /* repeat for numiterations times */
+    int total_time = 0;
     for (iteration = 0; iteration < numiterations; iteration++) {
         
         /* get starting time */
         gettimeofday(&gen_start, &tzp);
-        p_generate_random_ints(mymemory, numints);  /* random parallel fill */
+        p_generate_random_ints(mymemory, numints, ntotal);  /* random parallel fill */
         gettimeofday(&gen_end, &tzp);
         
         //Print out the input data
         print_data("INPUT", mymemory, numints, nprocs, ntotal);
 
         if(my_id == 0) {
-            printf("\nInput generation time = %ld (usec)\n", get_elapsed(&gen_start, &gen_end));
+            cout << "Input generation time - " << get_elapsed(&gen_start, &gen_end) << " (usec)\n"; 
         }
 
         /* Global barrier */
@@ -221,12 +224,15 @@ int main ( int argc, char **argv) {
         gettimeofday(&gen_end, &tzp);
         print_data("OUTPUT", mymemory, numints, nprocs, ntotal);
         if(my_id == 0) {
-            printf("\nOutput generation time = %ld (usec)\n", get_elapsed(&gen_start, &gen_end));
+            cout << "Output generation time - " << get_elapsed(&gen_start, &gen_end) << " (usec)\n"; 
+            total_time += get_elapsed(&gen_start, &gen_end);
         }
     }
 
     //Print out the output data
-
+    if(my_id == 0) {
+        cout << "Average output generation time = " << (float) total_time/numiterations << " (usec)\n"; 
+    }
     /* free memory */
     free(mymemory);
     MPI_Finalize();

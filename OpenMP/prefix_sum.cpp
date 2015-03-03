@@ -9,19 +9,21 @@
 #include <sstream>
 #include <iostream>
 #include <assert.h>
+#include <limits>
 
 using namespace std;
 
 class Prefix {
 public:
-    Prefix(int proc, int numints) {
-        this->proc = proc;
-        this->numints = numints;
-        this->s_proc = pow(2,ceil(log(proc)/log(2)));
-
+    Prefix(int proc, int numints, int ntotal) {
+        this->proc         = proc;
+        this->numints      = numints;
+        this->ntotal       = ntotal;
+        this->s_proc       = pow(2,ceil(log(proc)/log(2)));
+        
         /* Allocate shared memory, enough for each thread to have numints*/
-        this->data  = (int *) malloc(sizeof(int) * numints * proc);
-
+        this->data         = (int *) malloc(sizeof(int) * numints * proc);
+        
         /* Allocate shared memory for partial_sums */
         this->partial_sums = (long long*) calloc(proc, sizeof(long long) * proc);
     }
@@ -40,10 +42,11 @@ public:
             /* get the current thread ID in the parallel region */
             int tid = omp_get_thread_num();
             srand(tid + time(NULL));    /* Seed rand functions */
+            int mod = std::numeric_limits<int>::max() / (ntotal + 1);
 
             for(int i = tid * numints; i < (tid +1) * numints; ++i) {
-                //data[i] = rand()%10000;
-                data[i] = i + 1;
+                data[i] = rand()%mod;
+                // data[i] = i + 1;
             }
         }
     }
@@ -55,8 +58,10 @@ public:
         o.str("");
         o.clear();
     
-        for(int i = 0; i < (proc) * numints; ++i) {
+        int index = 0;
+        for(int i = 0; i < (proc) * numints && index < ntotal; ++i) {
             o << " " << data[i];
+            index++;
         }
     }
 
@@ -106,29 +111,15 @@ public:
             }
         }
 
-        //Allocate a temp memory to pop off the first value, which is a '0'
-        long long* temp = (long long*) malloc(sizeof(long long) * proc);
-        temp[proc-1] = max;
-
-        #pragma omp parallel for num_threads(proc - 1)
-        for(int i = 0; i < proc - 1; i++) {
-            temp[i] = partial_sums[i + 1];
-        }
-
-        free(partial_sums);
-        partial_sums = NULL;
-        this->partial_sums = temp;
-
-        //Now calculate the prefix sum for elements insde each n/p section
+        //Now calculate the prefix sum for elements inside each n/p section
         #pragma omp parallel num_threads(proc)
         {
             int tid        = omp_get_thread_num();
             int start_id   = tid * numints;
             int end_id     = (tid + 1) * numints;
-            long long diff = partial_sums[tid] - data[end_id-1];
 
             for(int i = start_id; i < end_id; ++i) {
-              data[i] += diff;
+              data[i] += partial_sums[tid];
             }
         }
     }
@@ -137,13 +128,14 @@ private:
     int proc;
     int numints;
     int s_proc;
+    int ntotal;
 
     int *data;
     long long *partial_sums;
 
 };
 
-long print_elapsed(struct timeval* start, struct timeval* end) {
+int get_elapsed(struct timeval* start, struct timeval* end) {
 
     struct timeval elapsed;
     /* calculate elapsed time */
@@ -165,6 +157,7 @@ long print_elapsed(struct timeval* start, struct timeval* end) {
 int main(int argc, char *argv[]) {
 
     int numints               = 0;
+    int ntotal                = 0;
     int numiterations         = 0;
     int numthreads            = 1;
 
@@ -176,29 +169,29 @@ int main(int argc, char *argv[]) {
     struct timeval start, end;   /* gettimeofday stuff */
     struct timezone tzp;
 
-    if( argc < 3) {
-        printf("Usage: %s [numthreads] [numints] [numiterations]\n\n", argv[0]);
+    if( argc < 4) {
+        printf("Usage: %s [numthreads] [ntotal] [numiterations]\n\n", argv[0]);
         exit(1);
     }
 
     numthreads    = atoi(argv[1]);
-    numints       = atoi(argv[2]);
+    ntotal        = atoi(argv[2]);
     numiterations = atoi(argv[3]);
+
+    numints  = (int)ceil(((float) ntotal/(float) numthreads));
 
     assert(numthreads > 0);
 
     //Set the number of threads
     omp_set_num_threads(numthreads);
 
-    printf("\nExecuting %s: nthreads=%d, numints=%d, numiterations=%d\n",
-            argv[0], omp_get_max_threads(), numints, numiterations);
+    printf("\nExecuting %s: nthreads=%d, ntotal=%d, numiterations=%d\n",
+            argv[0], omp_get_max_threads(), ntotal, numiterations);
 
-    
-
-    long total_time = 0.0;
+    int total_time = 0;
     for(int i = 0; i < numiterations; i++) {
         ostringstream oss;
-        Prefix* p = new Prefix(numthreads, numints);
+        Prefix* p = new Prefix(numthreads, numints, ntotal);
         gettimeofday(&start, &tzp);
         p->generate_input(10);
         gettimeofday(&end, &tzp);
@@ -208,26 +201,26 @@ int main(int argc, char *argv[]) {
         cout << oss.str();
         cout << "\n==============END INPUT=================================\n"; 
 
-        printf("\nInput generation time = %ld (usec)\n", print_elapsed(&start, &end));
+        cout << "\nInput generation time = " << get_elapsed(&start, &end) << " (usec)\n";
 
         gettimeofday(&start, &tzp);
         p->calculate_prefix();
         gettimeofday(&end,&tzp);
 
-         cout << "\n==============BEGIN OUTPUT==============================\n";
-         p->print(oss);
-         cout << oss.str();
-         cout << "\n==============END OUTPUT================================\n"; 
+        cout << "\n==============BEGIN OUTPUT==============================\n";
+        p->print(oss);
+        cout << oss.str();
+        cout << "\n==============END OUTPUT================================\n"; 
         delete(p);
-        total_time += print_elapsed(&start, &end);
-        printf("\nOutput generation time = %ld (usec)\n", print_elapsed(&start, &end));
+        total_time += get_elapsed(&start, &end);
+        cout << "\nOutput generation time = " << get_elapsed(&start, &end) << " (usec)\n";
     }
     
     /*****************************************************
     * Output timing results                             *
     *****************************************************/
 
-    printf("\nSummation total elapsed time = %ld (usec)\n", total_time / numiterations);
+    cout << "Average output generation time = " << (float) total_time/numiterations << " (usec)\n"; 
 
     return(0);
 }

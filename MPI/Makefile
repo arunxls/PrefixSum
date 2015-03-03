@@ -10,27 +10,8 @@ DFLAGS =         # common defines
 
 default:all
 
-all: sum_openmp sum_mpi sum_mpi2
+all: 
+	mpiicpc prefix_sum.cpp -o prefix_sum.x
 
-#
-# OpenMP summation demo program
-#
-
-sum_openmp:sum_openmp.cpp
-	$(CC) $(CFLAGS) $(DFLAGS) -fopenmp  -o $@  $@.cpp
-
-#
-# MPI summation demo programs
-#
-
-sum_mpi:sum_mpi.cpp
-	$(MPICC) $(CFLAGS) $(DFLAGS) -o $@ $@.cpp
-
-sum_mpi2:sum_mpi2.cpp
-	$(MPICC) $(CFLAGS) $(DFLAGS) -o $@ $@.cpp
-
-#
-# clean up
-#
 clean:
-	rm sum_openmp sum_mpi sum_mpi2 > /dev/null 2>&1
+	rm prefix_sum.x prefix_sum_mpi_*.o*> /dev/null 2>&1

@@ -1,7 +1,7 @@
 #PBS -l nodes=1:nehalem:ppn=8
 #PBS -l walltime=00:01:00
 #PBS -l mem=4gb
-#PBS -N psum_openmp_4cpu
+#PBS -N psum_openmp_8cpu
 #PBS -S /bin/bash
 #PBS -j oe
 #PBS -W NACCESSPOLICY:SINGLEJOB
@@ -13,8 +13,8 @@ export OMP_NUM_THREADS=8
 # $PBS_O_WORKDIR is the directory from which the job was submitted
 cd $PBS_O_WORKDIR
 
-./prefix_sum.x 8 1000 1
+./prefix_sum.x 8 1000 1000
 
-# output from the runs will be in psum_openmp_4cpu.o####
+# output from the runs will be in psum_openmp_8cpu.o####
 # where #### is the job id.
 #---------------- end of job file --------------------------
