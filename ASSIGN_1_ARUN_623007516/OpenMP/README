@@ -1,0 +1,9 @@
+1. Run 
+	./setup_env.sh 
+   to initialize the intel compilers
+2. Run 
+	make all
+   to compile the file
+3. Run 
+	qsub prefix_sum.job
+   to submit the job onto the compute farm

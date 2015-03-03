@@ -1,5 +1,5 @@
 #PBS -l nodes=4:nehalem:ppn=8
-#PBS -l walltime=00:01:00
+#PBS -l walltime=01:00:00
 #PBS -l mem=1gb
 #PBS -N prefix_sum_mpi_32
 #PBS -S /bin/bash

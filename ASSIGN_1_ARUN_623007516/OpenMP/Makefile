@@ -14,5 +14,5 @@ all:
 	icpc -O2 -openmp -lrt -o prefix_sum.x prefix_sum.cpp
 
 clean:
-	rm prefix_sum.x > /dev/null 2>&1
+	rm prefix_sum.x psum_openmp_*.o*> /dev/null 2>&1
 
