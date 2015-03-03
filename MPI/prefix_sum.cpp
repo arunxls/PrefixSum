@@ -81,21 +81,24 @@ long get_elapsed(struct timeval* start, struct timeval* end) {
  * print_data (prints memory array to stdout in order)
  *==============================================================*/
 
-void print_data(char* desc, int* memory, int n, int comm_size) {
+void print_data(char* desc, int* memory, int n, int comm_size, int ntotal) {
     int* buffer = (int *) malloc(sizeof(int) * n);
     MPI_Status status;
     int rank;
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank == 0) {
+        int index = 0;
         cout << "\n==============BEGIN "<< desc <<"==============================\n";
         for (int i = 0; i < n; i++) {
             std::cout << " " << memory[i];
+            index++;
         }
         for (int i = 1; i < comm_size; i++) {
             MPI_Recv(buffer, n, MPI_INT, i, 123, MPI_COMM_WORLD, &status);
-            for (int k = 0; k < n; k++) {
+            for (int k = 0; k < n && index < ntotal; k++) {
                 std::cout << " " << buffer[k];
+                index++;
             }
         }
         cout << "\n==============END "<< desc <<"================================\n";
@@ -112,7 +115,7 @@ void print_data(char* desc, int* memory, int n, int comm_size) {
  *  Main Program (Parallel Summation)
  *==============================================================*/
 int main ( int argc, char **argv) {
-    int nprocs, numints, numiterations; /* command line args */
+    int nprocs, numints, numiterations, ntotal; /* command line args */
     int my_id, iteration;
     int* mymemory;        /* pointer to processes memory              */
     int* buffer;
@@ -144,19 +147,21 @@ int main ( int argc, char **argv) {
             exit(1);
     }
 
-    numints       = atoi(argv[1]);
+    ntotal        = atoi(argv[1]);
     numiterations = atoi(argv[2]);
 
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs); /* Get number of processors */
 
     if(my_id == 0)
     printf("\nExecuting %s: nprocs=%d, numints=%d, numiterations=%d\n",
-            argv[0], nprocs, numints, numiterations);
+            argv[0], nprocs, ntotal, numiterations);
 
     /*---------------------------------------------------------
     *  Initialization
     *  - allocate memory for work area structures and work area
     *---------------------------------------------------------*/
+
+    numints  = (int)ceil(((float) ntotal/(float) nprocs));
 
     mymemory = (int *) calloc(numints, sizeof(int) * numints);
     buffer   = (int *) malloc(sizeof(int));
@@ -176,7 +181,7 @@ int main ( int argc, char **argv) {
         gettimeofday(&gen_end, &tzp);
         
         //Print out the input data
-        print_data("INPUT", mymemory, numints, nprocs);
+        print_data("INPUT", mymemory, numints, nprocs, ntotal);
 
         if(my_id == 0) {
             printf("\nInput generation time = %ld (usec)\n", get_elapsed(&gen_start, &gen_end));
@@ -214,7 +219,7 @@ int main ( int argc, char **argv) {
             mymemory[i] = mymemory[i] + diff;
         }
         gettimeofday(&gen_end, &tzp);
-        print_data("OUTPUT", mymemory, numints, nprocs);
+        print_data("OUTPUT", mymemory, numints, nprocs, ntotal);
         if(my_id == 0) {
             printf("\nOutput generation time = %ld (usec)\n", get_elapsed(&gen_start, &gen_end));
         }
