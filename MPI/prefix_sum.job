@@ -1,6 +1,6 @@
-#PBS -l nodes=4:nehalem:ppn=8
-#PBS -l walltime=00:01:00
-#PBS -l mem=1gb
+#PBS -l nodes=4:nehalem:ppn=8,walltime=10:00:00,mem=128gb
+#PBS -l walltime=04:00:00
+#PBS -l mem=128gb
 #PBS -N prefix_sum_mpi_32
 #PBS -S /bin/bash
 #PBS -j oe
@@ -10,7 +10,38 @@
 cd $PBS_O_WORKDIR
 
 source ./setup_env.sh
-mpirun -np 32 ./prefix_sum.x 1000 1000
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
+mpirun mpirun ./prefix_sum.x 1000 1
 
 # output from the runs will be in prefix_sum_mpi_32.o#### where #### is the job id.
 #---------------- end of job file --------------------------

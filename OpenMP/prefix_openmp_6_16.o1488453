@@ -1,0 +1,13 @@
+Activated IntelXE (13.1) Compiler set (13.1.2-183). See: module help intel/compilers/13.1.2.183
+Activated Intel 13.1 (XE) MPI version 4.1.0 (030). Use 'module help intel/mpi/4.1.0.030' To get you started.
+997420
+898172
+1014686
+1109576
+1008204
+1012503
+1159678
+1121634
+1205315
+1213745
+=>> PBS: job killed: walltime 3626 exceeded limit 3600

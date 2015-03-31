@@ -1,0 +1,47 @@
+#PBS -l nodes=1:ppn=1,walltime=00:10:00,mem=2gb
+#PBS -N prefix_seq_512
+#PBS -S /bin/bash
+#PBS -j oe
+#PBS -W NACCESSPOLICY:SINGLEJOB
+#
+
+## Some job preprocessing may go here
+# $PBS_O_WORKDIR is the directory from which the job was submitted
+cd $PBS_O_WORKDIR
+
+source ./setup_env.sh
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+./prefix_sum.x 1000 1
+
+# output from the runs will be in prefix_seq_1.o####
+# where #### is the job id.
+#---------------- end of job file --------------------------

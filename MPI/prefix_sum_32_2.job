@@ -1,0 +1,49 @@
+#PBS -l nodes=4:ppn=8
+#PBS -l walltime=01:00:00
+#PBS -l mem=3gb
+#PBS -N prefix_mpi_32_2
+#PBS -S /bin/bash
+#PBS -j oe
+#PBS -W NACCESSPOLICY:SINGLEJOB
+#
+
+## Some job preprocessing may go here
+
+# $PBS_O_WORKDIR is the directory from which the job was submitted
+cd $PBS_O_WORKDIR
+
+source ./setup_env.sh
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+mpirun ./prefix_sum.x 125000000 2 1
+# output from the runs will be in prefix_mpi_32_2.o####
+# where #### is the job id.
+#---------------- end of job file --------------------------

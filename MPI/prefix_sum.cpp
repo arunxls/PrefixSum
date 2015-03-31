@@ -31,19 +31,19 @@
 #include <sys/time.h>
 #include <iostream>
 #include <math.h>
- #include <limits>
+#include <limits>
 
 using namespace std;
 
 /*==============================================================
  * p_generate_random_ints (processor-wise generation of random ints)
  *==============================================================*/
-void p_generate_random_ints(int* memory, int n, int ntotal) {
+void p_generate_random_ints(long long int* memory, long long int n, long long int ntotal) {
     int my_id;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_id);
     srand(my_id + time(NULL));                  /* Seed rand functions */
-    int mod = std::numeric_limits<int>::max() / (ntotal + 1);
-    for (int i = 0; i <  n; ++i) {
+    long long int mod = std::numeric_limits<long long int>::max() / (ntotal + 1);
+    for (long long int i = 0; i <  n; ++i) {
         memory[i] = rand() % mod;
         // memory[i] = (my_id*n) + i + 1;
     }
@@ -53,8 +53,8 @@ void p_generate_random_ints(int* memory, int n, int ntotal) {
  * p_summation (processor-wise summation of ints by calculating
  * prefix-sums for each n/p section)
  *==============================================================*/
-int p_summation(int* memory, int n) {
-    for (int i = 1; i < n; ++i) {
+long long int p_summation(long long int* memory, long long int n) {
+    for (long long int i = 1; i < n; ++i) {
         memory[i] += memory[i-1];
     }
     
@@ -83,27 +83,27 @@ int get_elapsed(struct timeval* start, struct timeval* end) {
  * print_data (prints memory array to stdout in order)
  *==============================================================*/
 
-void print_data(char* desc, int* memory, int n, int comm_size, int ntotal) {
-    int* buffer = (int *) malloc(sizeof(int) * n);
+void print_data(char* desc, long long int* memory, long long int n, int comm_size, long long int ntotal) {
+    long long int* buffer = (long long int *) malloc(sizeof(long long int) * n);
     MPI_Status status;
     int rank;
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank == 0) {
         int index = 0;
-        cout << "\n==============BEGIN "<< desc <<"==============================\n";
-        for (int i = 0; i < n; i++) {
+        // cout << "\n==============BEGIN "<< desc <<"==============================\n";
+        for (long long int i = 0; i < n; i++) {
             std::cout << " " << memory[i];
             index++;
         }
         for (int i = 1; i < comm_size; i++) {
             MPI_Recv(buffer, n, MPI_INT, i, 123, MPI_COMM_WORLD, &status);
-            for (int k = 0; k < n && index < ntotal; k++) {
+            for (long long int k = 0; k < n && index < ntotal; k++) {
                 std::cout << " " << buffer[k];
                 index++;
             }
         }
-        cout << "\n==============END "<< desc <<"================================\n";
+        // cout << "\n==============END "<< desc <<"================================\n";
     } else {
         MPI_Send(memory, n, MPI_INT, 0, 123, MPI_COMM_WORLD);
     }
@@ -117,10 +117,11 @@ void print_data(char* desc, int* memory, int n, int comm_size, int ntotal) {
  *  Main Program (Parallel Summation)
  *==============================================================*/
 int main ( int argc, char **argv) {
-    int nprocs, numints, numiterations, ntotal; /* command line args */
-    int my_id, iteration;
-    int* mymemory;        /* pointer to processes memory              */
-    int* buffer;
+    int nprocs, numiterations, nmult; /* command line args */
+    long long int ntotal, numints;
+    int my_id;
+    long long int* mymemory;        /* pointer to processes memory              */
+    long long int* buffer;
 
     struct timeval gen_start, gen_end; /* gettimeofday stuff */
     struct timeval start, end;         /* gettimeofday stuff */
@@ -142,41 +143,49 @@ int main ( int argc, char **argv) {
     *  Read Command Line
     *  - check usage and parse args
     *---------------------------------------------------------*/
-    if(argc < 3) {
-        if(my_id == 0)
-            printf("Usage: %s [numints] [numiterations]\n\n", argv[0]);
-            MPI_Finalize();
-            exit(1);
+    if(argc < 4) {
+        if(my_id == 0) {
+            printf("Usage: %s [numints] [nmult] [numiterations]\n\n", argv[0]);
+        }
+
+        MPI_Finalize();
+        exit(1);
     }
 
     ntotal        = atoi(argv[1]);
-    numiterations = atoi(argv[2]);
+    nmult         = atoi(argv[2]);
+    numiterations = atoi(argv[3]);
+    
+    ntotal        = ntotal * nmult;
+
+    // numints  = (long long int)ceil(((long long) ntotal/(long long) numthreads));
 
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs); /* Get number of processors */
+    // printf("PROCS %d %d\n", nprocs, sizeof(int));
 
-    if(my_id == 0)
-    printf("\nExecuting %s: nprocs=%d, numints=%d, numiterations=%d\n",
-            argv[0], nprocs, ntotal, numiterations);
+    // if(my_id == 0)
+    // printf("\nExecuting %s: nprocs=%d, numints=%d, numiterations=%d\n",
+    //         argv[0], nprocs, ntotal, numiterations);
+
+    numints = 1 + ((ntotal - 1) / nprocs);
 
     /*---------------------------------------------------------
     *  Initialization
     *  - allocate memory for work area structures and work area
     *---------------------------------------------------------*/
 
-    numints  = (int)ceil(((float) ntotal/(float) nprocs));
-
-    mymemory = (int *) calloc(numints, sizeof(int) * numints);
-    buffer   = (int *) malloc(sizeof(int));
+    mymemory = (long long int *) malloc(sizeof(long long int) * numints);
+    buffer   = (long long int *) malloc(sizeof(long long int));
 
     if(mymemory == NULL || buffer == NULL) {
-        printf("Processor %d - unable to malloc()\n", my_id);
+        printf("Processor %d - unable to malloc() - %lld\n", my_id, numints);
         MPI_Finalize();
         exit(1);
     }
 
     /* repeat for numiterations times */
     int total_time = 0;
-    for (iteration = 0; iteration < numiterations; iteration++) {
+    for (long long int iteration = 0; iteration < numiterations; iteration++) {
         
         /* get starting time */
         gettimeofday(&gen_start, &tzp);
@@ -184,10 +193,10 @@ int main ( int argc, char **argv) {
         gettimeofday(&gen_end, &tzp);
         
         //Print out the input data
-        print_data("INPUT", mymemory, numints, nprocs, ntotal);
+        // print_data("INPUT", mymemory, numints, nprocs, ntotal);
 
         if(my_id == 0) {
-            cout << "Input generation time - " << get_elapsed(&gen_start, &gen_end) << " (usec)\n"; 
+            // cout << "Input generation time - " << get_elapsed(&gen_start, &gen_end) << " (usec)\n";
         }
 
         /* Global barrier */
@@ -195,11 +204,11 @@ int main ( int argc, char **argv) {
 
         gettimeofday(&gen_start, &tzp);
         //Compute the prefix section for each n/p section.
-        for (int i = 1; i < numints; ++i) {
+        for (long long int i = 1; i < numints; ++i) {
             mymemory[i] += mymemory[i-1];
         }
 
-        int sum = mymemory[numints - 1]; /* sum of each individual processor */
+        long long int sum = mymemory[numints - 1]; /* sum of each individual processor */
         int iters = pow(2,ceil(log(nprocs)/log(2)));
 
         for(int i = 0; i < iters - 1 ; i++) {
@@ -217,21 +226,24 @@ int main ( int argc, char **argv) {
 
         //Now that we have the prefix sums, find the diff and
         //add to the remaining elements to get a true prefix sum
-        int diff = sum - mymemory[numints - 1];
-        for(int i = 0; i < numints; i++) {
+        long long int diff = sum - mymemory[numints - 1];
+        for(long long int i = 0; i < numints; i++) {
             mymemory[i] = mymemory[i] + diff;
         }
         gettimeofday(&gen_end, &tzp);
-        print_data("OUTPUT", mymemory, numints, nprocs, ntotal);
+        // print_data("OUTPUT", mymemory, numints, nprocs, ntotal);
         if(my_id == 0) {
-            cout << "Output generation time - " << get_elapsed(&gen_start, &gen_end) << " (usec)\n"; 
+            // cout << "Output generation time - " << get_elapsed(&gen_start, &gen_end) << " (usec)\n";
             total_time += get_elapsed(&gen_start, &gen_end);
         }
     }
 
     //Print out the output data
     if(my_id == 0) {
-        cout << "Average output generation time = " << (float) total_time/numiterations << " (usec)\n"; 
+        // cout << "Average output generation time = " << (float) total_time/numiterations << " (usec)\n"; 
+        // cout << (float) total_time/numiterations << "\n";
+        cout << total_time << "\n";
+
     }
     /* free memory */
     free(mymemory);
